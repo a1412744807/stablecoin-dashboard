@@ -18,6 +18,12 @@ def load_data():
     df = pd.read_csv(SHEET_URL)
     return df
 
+# 列名常量（从表格获取）
+COL_PLATFORM = '平台'
+COL_COIN = '币种'
+COL_APY = '年化（APY）'
+COL_LINK = '理财链接'
+
 try:
     df = load_data()
     
@@ -25,41 +31,46 @@ try:
     col1, col2 = st.columns([3, 1])
     
     with col2:
-        coin_filter = st.multiselect("🔍 筛选币种", options=df['币种'].unique(), default=df['币种'].unique())
+        coin_filter = st.multiselect("🔍 筛选币种", options=df[COL_COIN].unique(), default=df[COL_COIN].unique())
     
     # 过滤数据
-    filtered_df = df[df['币种'].isin(coin_filter)].copy()
+    filtered_df = df[df[COL_COIN].isin(coin_filter)].copy()
     
     # 计算 APY 数值用于排序和高亮
-    filtered_df['APY数值'] = filtered_df['活期年化 (APY)'].str.rstrip('%').astype(float)
+    filtered_df['APY数值'] = filtered_df[COL_APY].str.rstrip('%').astype(float)
     max_apy = filtered_df['APY数值'].max()
     
     # 展示核心数据卡片 (最高收益)
     with col1:
         if not filtered_df.empty:
             max_apy_row = filtered_df.loc[filtered_df['APY数值'].idxmax()]
-            st.metric(label=f"🔥 当前最高收益 ({max_apy_row['交易所']})", value=max_apy_row['活期年化 (APY)'])
+            st.metric(label=f"🔥 当前最高收益 ({max_apy_row[COL_PLATFORM]})", value=max_apy_row[COL_APY])
 
-    # 准备显示的 DataFrame（不含辅助列）
-    display_df = filtered_df.drop(columns=['APY数值'])
+    # 准备显示的 DataFrame（不含辅助列，重置索引去掉左边索引列）
+    display_df = filtered_df.drop(columns=['APY数值']).reset_index(drop=True)
     
-    # 高亮样式函数 - 根据索引判断是否是最高APY行
-    max_apy_idx = filtered_df['APY数值'].idxmax()
-    
+    # 高亮样式函数 - 根据APY值判断是否是最高APY行
     def highlight_max_apy(row):
-        if row.name == max_apy_idx:
+        # 获取当前行的APY值
+        apy_val = float(row[COL_APY].rstrip('%'))
+        if apy_val == max_apy:
             return ['background-color: #d4edda; color: #155724; font-weight: bold'] * len(row)
         return [''] * len(row)
     
-    # 应用样式
-    styled_df = display_df.style.apply(highlight_max_apy, axis=1)
+    # 应用样式：字体加大 + 标题加粗 + 高亮最高APY行
+    styled_df = display_df.style.apply(highlight_max_apy, axis=1).set_properties(**{
+        'font-size': '16px'
+    }).set_table_styles([
+        {'selector': 'th', 'props': [('font-weight', 'bold'), ('font-size', '16px')]}
+    ])
 
-    # 展示主表格（带链接按钮和高亮）
+    # 展示主表格（带链接按钮和高亮，隐藏索引列）
     st.dataframe(
         styled_df,
         use_container_width=True,
+        hide_index=True,
         column_config={
-            "理财链接": st.column_config.LinkColumn(
+            COL_LINK: st.column_config.LinkColumn(
                 "🚀 去理财",
                 display_text="前往理财",
                 help="点击跳转到对应交易所理财页面"
