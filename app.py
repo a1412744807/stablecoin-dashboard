@@ -21,9 +21,11 @@ def load_data():
 try:
     df = load_data()
     
-    # 侧边栏：筛选功能
-    st.sidebar.header("筛选设置")
-    coin_filter = st.sidebar.multiselect("选择币种", options=df['币种'].unique(), default=df['币种'].unique())
+    # 展示核心数据卡片 (最高收益) 和 筛选器 并排
+    col1, col2 = st.columns([3, 1])
+    
+    with col2:
+        coin_filter = st.multiselect("🔍 筛选币种", options=df['币种'].unique(), default=df['币种'].unique())
     
     # 过滤数据
     filtered_df = df[df['币种'].isin(coin_filter)].copy()
@@ -33,18 +35,23 @@ try:
     max_apy = filtered_df['APY数值'].max()
     
     # 展示核心数据卡片 (最高收益)
-    if not filtered_df.empty:
-        max_apy_row = filtered_df.loc[filtered_df['APY数值'].idxmax()]
-        st.metric(label=f"🔥 当前最高收益 ({max_apy_row['交易所']})", value=max_apy_row['活期年化 (APY)'])
+    with col1:
+        if not filtered_df.empty:
+            max_apy_row = filtered_df.loc[filtered_df['APY数值'].idxmax()]
+            st.metric(label=f"🔥 当前最高收益 ({max_apy_row['交易所']})", value=max_apy_row['活期年化 (APY)'])
 
-    # 高亮样式函数
+    # 准备显示的 DataFrame（不含辅助列）
+    display_df = filtered_df.drop(columns=['APY数值'])
+    
+    # 高亮样式函数 - 根据索引判断是否是最高APY行
+    max_apy_idx = filtered_df['APY数值'].idxmax()
+    
     def highlight_max_apy(row):
-        if row['APY数值'] == max_apy:
+        if row.name == max_apy_idx:
             return ['background-color: #d4edda; color: #155724; font-weight: bold'] * len(row)
         return [''] * len(row)
     
-    # 应用样式（排除辅助列）
-    display_df = filtered_df.drop(columns=['APY数值'])
+    # 应用样式
     styled_df = display_df.style.apply(highlight_max_apy, axis=1)
 
     # 展示主表格（带链接按钮和高亮）
